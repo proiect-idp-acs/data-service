@@ -5,9 +5,9 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from prometheus_fastapi_instrumentator import Instrumentator
 import os
 
-app = FastAPI(title="Tournament Data Service", description="Operațiuni CRUD cu PostgreSQL")
+app = FastAPI(title="Tournament Data Service", description="Operatiuni CRUD cu PostgreSQL")
 
-# Configurarea Bazei de Date
+# Configurarea bazei de date
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://tennis_admin:supersecretpassword@postgres_db:5432/tennis_db")
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -63,21 +63,20 @@ def get_match(match_id: int):
     match = db.query(MatchDB).filter(MatchDB.id == match_id).first()
     db.close()
     if not match:
-        raise HTTPException(status_code=404, detail="Meciul nu a fost găsit")
+        raise HTTPException(status_code=404, detail="Meciul nu a fost gasit")
     return match
 
-# Actualizarea unui meci (apelat de Match Service)
+# Actualizarea unui meci (apelat de Match Mgmt Service)
 @app.put("/api/data/matches/{match_id}")
 def update_match(match_id: int, match_update: MatchUpdate):
     db: Session = SessionLocal()
     
-    # 1. Verificăm dacă meciul există
+    # Verificam daca meciul exista
     db_match = db.query(MatchDB).filter(MatchDB.id == match_id).first()
     if not db_match:
         db.close()
-        raise HTTPException(status_code=404, detail="Meciul nu a fost găsit")
+        raise HTTPException(status_code=404, detail="Meciul nu a fost gasit")
         
-    # 2. Forțăm scrierea DIRECTĂ prin comandă SQL (Bypass la ORM)
     update_data = {
         "status": match_update.status,
         "score": match_update.score
@@ -88,7 +87,7 @@ def update_match(match_id: int, match_update: MatchUpdate):
     db.query(MatchDB).filter(MatchDB.id == match_id).update(update_data)
     db.commit()
     
-    # 3. Preluăm noile date proaspăt salvate pentru a le returna
+    # preluam noile date proaspat salvate pentru a le returna
     db.refresh(db_match)
     db.close()
     
