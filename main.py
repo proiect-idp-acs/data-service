@@ -21,7 +21,7 @@ class MatchDB(Base):
     player1 = Column(String, index=True)
     player2 = Column(String, index=True)
     status = Column(String, default="Scheduled") # Scheduled, In_Progress, Completed
-    score = Column(JSON, default={"sets": [0, 0], "games": [0, 0], "points": ["0", "0"]})
+    score = Column(JSON, default=lambda: {"sets": [0, 0], "games": [0, 0], "points": ["0", "0"]})
     winner = Column(String, nullable=True)
 
 Base.metadata.create_all(bind=engine)
@@ -33,7 +33,7 @@ class MatchCreate(BaseModel):
 class MatchUpdate(BaseModel):
     status: str
     score: dict
-    winner: str = None
+    winner: str | None = None
 
 Instrumentator().instrument(app).expose(app)
 
@@ -70,18 +70,26 @@ def get_match(match_id: int):
 @app.put("/api/data/matches/{match_id}")
 def update_match(match_id: int, match_update: MatchUpdate):
     db: Session = SessionLocal()
-    db_match = db.query(MatchDB).filter(MatchDB.id == match_id).first()
     
+    # 1. Verificăm dacă meciul există
+    db_match = db.query(MatchDB).filter(MatchDB.id == match_id).first()
     if not db_match:
         db.close()
         raise HTTPException(status_code=404, detail="Meciul nu a fost găsit")
         
-    db_match.status = match_update.status
-    db_match.score = match_update.score
+    # 2. Forțăm scrierea DIRECTĂ prin comandă SQL (Bypass la ORM)
+    update_data = {
+        "status": match_update.status,
+        "score": match_update.score
+    }
     if match_update.winner:
-        db_match.winner = match_update.winner
+        update_data["winner"] = match_update.winner
         
+    db.query(MatchDB).filter(MatchDB.id == match_id).update(update_data)
     db.commit()
+    
+    # 3. Preluăm noile date proaspăt salvate pentru a le returna
     db.refresh(db_match)
     db.close()
+    
     return db_match
